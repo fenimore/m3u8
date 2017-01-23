@@ -1,9 +1,16 @@
 package m3u8
 
 import (
-	"m3u8"
+	//"github.com/polypmer/m3u8"
+	"io"
+	"log"
+	"strings"
 	"testing"
 )
+
+func TestReader(t *testing.T) {
+	//do nothing
+}
 
 func ExampleReader() {
 	in := `#EXTM3U
@@ -14,17 +21,18 @@ C:\Path\Sample.mp3
 #EXTINF:321,Example Artist - Example title
 /home/user/Music/example.ogg
 `
-	r := m3u8.NewReader(strings.NewReader(in))
+	r := NewReader(strings.NewReader(in))
+	b := make([]byte, 0)
 
 	for {
-		src, err := r.Read()
+		_, err := r.Read(b)
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(src)
+		log.Println(string(b))
 	}
 
 	// Output:

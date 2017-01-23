@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 )
 
 // A ParseError is returned for parsing errors.
@@ -74,63 +75,69 @@ func (r *Reader) error(err error) error {
 
 // Read reads one line from r. The line is a string.
 // string representing one field.
-func (r *Reader) Read() (src string, err error) {
+func (r *Reader) Read(b []byte) (n int, err error) {
 	for {
-		src, err = r.parsePlaylist()
-		if src != nil {
+		rune, err := r.reader.ReadByte()
+		if rune == '\n' || rune == '#' {
 			break
 		}
+		b = append(b, rune)
 		if err != nil {
-			return nil, err
+			return len(b), err
 		}
 	}
-	return "", nil
-}
-
-func (r *Reader) parsePlaylist() (src string, err error) {
-	r.line++ // increment which line we're on
-	// Peek at the first rune. If it is an error we are done.
-	// If we support comments and it is the comment character
-	rune, _, err := r.reader.ReadRune()
-	if err != nil {
-		return "", err
-	}
-	if rune == r.Comment {
-		return "", r.skip('\n')
-	}
-	r.reader.UnreadRune() // put the rune back (returns err)?
-	// this is a directory or song:
-	for {
-		ok, err := r.parseSrc()
-		if ok {
-			src = r.src.String()
-			return src, err
-		}
-		if err == io.EOF {
-			return src, err
-		} else if err != nil {
-			return "", err
-		}
-	}
+	log.Print(string(b))
+	return len(b), nil
 }
 
 func (r *Reader) parseSrc() (bool, error) {
 	r.src.Reset()
 
-	rune, err := r.reader.ReadRune()
-	for err == nil && rune != "\n" {
-
+	rune, _, err := r.reader.ReadRune()
+	for err == nil && rune != '\n' {
+		rune, _, err = r.reader.ReadRune()
 	}
+
+	if err == io.EOF {
+		return true, err
+	}
+	if err != nil {
+		return false, err
+	}
+
+	switch rune {
+	case '\n':
+		return true, nil
+	default:
+		for {
+			r.src.WriteRune(rune)
+			rune, _, err = r.reader.ReadRune()
+			if err != nil || rune == '\n' {
+				break
+			}
+			if rune == '\n' {
+				return true, nil
+			}
+		}
+	}
+
+	if err != nil {
+		if err == io.EOF {
+			return true, err
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // skip reads runes up to and including the rune delim or until error.
 func (r *Reader) skip(delim rune) error {
 	for {
-		r1, err := r.readRune()
+		rune, _, err := r.reader.ReadRune()
 		if err != nil {
 			return err
 		}
-		if r1 == delim {
+		if rune == delim {
 			return nil
 		}
 	}
