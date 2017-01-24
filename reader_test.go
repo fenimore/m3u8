@@ -2,39 +2,25 @@ package m3u8
 
 import (
 	//"github.com/polypmer/m3u8"
-	"io"
-	"log"
 	"strings"
 	"testing"
 )
 
-func TestReader(t *testing.T) {
-	//do nothing
-}
-
-func ExampleReader() {
+func TestRead(t *testing.T) {
 	in := `#EXTM3U
 
 #EXTINF:123, Sample artist - Sample title
-C:\Path\Sample.mp3
+/home/user/Music/sample.mp3
 
 #EXTINF:321,Example Artist - Example title
 /home/user/Music/example.ogg
 `
 	r := NewReader(strings.NewReader(in))
-	b := make([]byte, 0)
-
-	for {
-		_, err := r.Read(b)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Println(string(b))
+	src, err := r.Read()
+	if err != nil {
+		t.Error(err)
 	}
-
-	// Output:
-	// [C:\Path\Sample.mp3 (123 * time.second) "Sample artist - Sample title"]
+	if src[0] != "/home/user/Music/sample.mp3" {
+		t.Error("DIdn't read the right src")
+	}
 }

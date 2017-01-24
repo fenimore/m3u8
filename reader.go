@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	_ "log"
 )
 
 // A ParseError is returned for parsing errors.
@@ -51,8 +51,9 @@ type Reader struct {
 	// TrimLeadingSpace bool
 
 	line   int
+	abs    string // absolute path
 	reader *bufio.Reader
-	src    bytes.Buffer
+	src    bytes.Buffer // the source of Read
 }
 
 // NewReader returns a new Reader that reads from r.
@@ -75,59 +76,101 @@ func (r *Reader) error(err error) error {
 
 // Read reads one line from r. The line is a string.
 // string representing one field.
-func (r *Reader) Read(b []byte) (n int, err error) {
+func (r *Reader) Read() (src []string, err error) {
 	for {
-		rune, err := r.reader.ReadByte()
-		if rune == '\n' || rune == '#' {
+		src, err = r.parsePlaylist()
+		if src != nil {
 			break
 		}
-		b = append(b, rune)
 		if err != nil {
-			return len(b), err
+			return nil, err
 		}
 	}
-	log.Print(string(b))
-	return len(b), nil
+	return src, nil
 }
 
-func (r *Reader) parseSrc() (bool, error) {
+// parseSrc reads and parses a single m3u8 src
+func (r *Reader) parsePlaylist() (src []string, err error) {
+	r.line++
+
+	rune, err := r.readRune()
+	if err != nil {
+		return nil, err
+	}
+
+	if rune == r.Comment {
+		r.line++
+		return nil, r.skip('\n')
+	}
+	if rune == r.Newline {
+		return nil, r.skip('\n')
+	}
+
+	r.reader.UnreadRune()
+	// At this point we have at least another Playlist.
+	for {
+		have, delim, err := r.parseSrc()
+		if have {
+			src = append(src, r.src.String())
+		}
+		// FIXME, except where the comment was?
+		if delim == '\n' || err == io.EOF {
+			r.line++
+			return src, err
+		} else if err != nil {
+			return nil, err
+		}
+	}
+}
+
+func (r *Reader) parseMeta() (have bool, delim rune, err error) {
+	// switch on possible Meta information
+	return have, delim, err
+}
+
+// TODO: get meta data
+func (r *Reader) parseSrc() (have bool, delim rune, err error) {
 	r.src.Reset()
 
-	rune, _, err := r.reader.ReadRune()
-	for err == nil && rune != '\n' {
-		rune, _, err = r.reader.ReadRune()
-	}
+	rune, err := r.readRune()
 
 	if err == io.EOF {
-		return true, err
+		return true, 0, err
 	}
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 
 	switch rune {
+	case r.Newline:
+		// Check below
 	case '\n':
-		return true, nil
+		return false, rune, nil
+	//case r.Comment:
+
 	default:
 		for {
 			r.src.WriteRune(rune)
-			rune, _, err = r.reader.ReadRune()
-			if err != nil || rune == '\n' {
+			rune, err = r.readRune()
+			if err != nil || rune == r.Newline {
 				break
-			}
-			if rune == '\n' {
-				return true, nil
 			}
 		}
 	}
 
-	if err != nil {
-		if err == io.EOF {
-			return true, err
-		}
-		return false, err
+	if err == io.EOF {
+		return true, 0, err
 	}
-	return true, nil
+	if err != nil {
+		return false, 0, err
+	}
+	return true, rune, nil
+}
+
+func (r *Reader) readRune() (rune, error) {
+	rune, _, err := r.reader.ReadRune()
+	// should I handle strange things?
+	return rune, err
 }
 
 // skip reads runes up to and including the rune delim or until error.
