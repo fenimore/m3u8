@@ -87,6 +87,19 @@ func (r *Reader) Read() (src []string, err error) {
 	return src, nil
 }
 
+func (r *Reader) ReadAll() (srcs []string, err error) {
+	for {
+		src, err := r.Read()
+		if err == io.EOF {
+			return srcs, err
+		}
+		if err != nil {
+			return nil, err
+		}
+		srcs = append(srcs, src...)
+	}
+}
+
 // parseSrc reads and parses a single m3u8 src
 func (r *Reader) parsePlaylist() (src []string, err error) {
 	r.line++
