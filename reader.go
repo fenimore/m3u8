@@ -1,3 +1,5 @@
+// m3u8 package parses m3u and m3u8 playlist files.
+//
 // The source:
 //
 //#EXTM3U
@@ -11,11 +13,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	_ "log"
 )
 
 // A ParseError is returned for parsing errors.
-// The first line is 1.  The first column is 0.
 type ParseError struct {
 	Line int   // Line where the error occurred
 	Err  error // The actual error
@@ -25,7 +25,7 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("line %d: %s", e.Line, e.Err)
 }
 
-// These are the errors that can be returned in ParseError.Error
+// TODO These are the errors that can be returned in ParseError.Error
 var (
 	ErrNoHeader = errors.New("no #EXTM3U header")
 	ErrNoSource = errors.New("no source found")
@@ -36,8 +36,6 @@ var (
 // As returned by NewReader, a Reader expects input conforming to RFC SIKE.
 // The exported fields can be changed to customize the details before the
 // first call to Read or ReadAll.
-//
-//
 type Reader struct {
 	// Newline is the field delimiter.
 	// It is set to \n ('\n'), by NewReader.
@@ -123,12 +121,14 @@ func (r *Reader) parsePlaylist() (src []string, err error) {
 	}
 }
 
+// parseMeta TODO: get title and time of song
 func (r *Reader) parseMeta() (have bool, delim rune, err error) {
 	// switch on possible Meta information
 	return have, delim, err
 }
 
-// TODO: get meta data
+// parseSrc gets a source from the playlist. Returns
+// the last rune consumed
 func (r *Reader) parseSrc() (have bool, delim rune, err error) {
 	r.src.Reset()
 
@@ -167,6 +167,7 @@ func (r *Reader) parseSrc() (have bool, delim rune, err error) {
 	return true, rune, nil
 }
 
+// readRune is a wrapper around the bytes.Buffer Reader.
 func (r *Reader) readRune() (rune, error) {
 	rune, _, err := r.reader.ReadRune()
 	// should I handle strange things?
